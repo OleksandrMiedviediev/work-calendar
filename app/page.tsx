@@ -33,11 +33,11 @@ type Profile = {
   language: Language;
 };
 
-const uiCopy: Record<Language, { signIn: string; register: string; forgot: string; settings: string; library: string; workspace: string; upload: string }> = {
-  ru: { signIn: "Войти", register: "Создать аккаунт", forgot: "Забыли пароль?", settings: "Настройки", library: "Библиотека", workspace: "Рабочая область", upload: "Загрузить график" },
-  uk: { signIn: "Увійти", register: "Створити акаунт", forgot: "Забули пароль?", settings: "Налаштування", library: "Бібліотека", workspace: "Робоча область", upload: "Завантажити графік" },
-  en: { signIn: "Sign in", register: "Create account", forgot: "Forgot password?", settings: "Settings", library: "Library", workspace: "Workspace", upload: "Upload schedule" },
-  pl: { signIn: "Zaloguj się", register: "Utwórz konto", forgot: "Nie pamiętasz hasła?", settings: "Ustawienia", library: "Biblioteka", workspace: "Obszar pracy", upload: "Prześlij grafik" }
+const uiCopy: Record<Language, { signIn: string; register: string; forgot: string; settings: string; library: string; workspace: string; upload: string; savedMonths: string; pdfSchedules: string; review: string; save: string; close: string; cancel: string; delete: string; open: string; logout: string; email: string; password: string; newPassword: string; resetPassword: string; chooseFile: string; supportedPdf: string; calendarName: string; appleCalendar: string; download: string }> = {
+  ru: { signIn: "Войти", register: "Создать аккаунт", forgot: "Забыли пароль?", settings: "Настройки", library: "Библиотека", workspace: "Рабочая область", upload: "Загрузить график", savedMonths: "Сохранённые месяцы", pdfSchedules: "Графики в PDF", review: "Проверка графика", save: "Сохранить", close: "Закрыть", cancel: "Отмена", delete: "Удалить", open: "Открыть", logout: "Выйти", email: "Email", password: "Пароль", newPassword: "Новый пароль", resetPassword: "Восстановление пароля", chooseFile: "Выбрать PDF", supportedPdf: "Поддерживается только PDF", calendarName: "Название календаря", appleCalendar: "Подписка Apple Calendar", download: "Скачать .ics" },
+  uk: { signIn: "Увійти", register: "Створити акаунт", forgot: "Забули пароль?", settings: "Налаштування", library: "Бібліотека", workspace: "Робоча область", upload: "Завантажити графік", savedMonths: "Збережені місяці", pdfSchedules: "Графіки в PDF", review: "Перевірка графіка", save: "Зберегти", close: "Закрити", cancel: "Скасувати", delete: "Видалити", open: "Відкрити", logout: "Вийти", email: "Email", password: "Пароль", newPassword: "Новий пароль", resetPassword: "Відновлення пароля", chooseFile: "Обрати PDF", supportedPdf: "Підтримується лише PDF", calendarName: "Назва календаря", appleCalendar: "Підписка Apple Calendar", download: "Завантажити .ics" },
+  en: { signIn: "Sign in", register: "Create account", forgot: "Forgot password?", settings: "Settings", library: "Library", workspace: "Workspace", upload: "Upload schedule", savedMonths: "Saved months", pdfSchedules: "PDF schedules", review: "Schedule review", save: "Save", close: "Close", cancel: "Cancel", delete: "Delete", open: "Open", logout: "Sign out", email: "Email", password: "Password", newPassword: "New password", resetPassword: "Password recovery", chooseFile: "Choose PDF", supportedPdf: "PDF files only", calendarName: "Calendar name", appleCalendar: "Apple Calendar subscription", download: "Download .ics" },
+  pl: { signIn: "Zaloguj się", register: "Utwórz konto", forgot: "Nie pamiętasz hasła?", settings: "Ustawienia", library: "Biblioteka", workspace: "Obszar pracy", upload: "Prześlij grafik", savedMonths: "Zapisane miesiące", pdfSchedules: "Grafiki PDF", review: "Sprawdzenie grafiku", save: "Zapisz", close: "Zamknij", cancel: "Anuluj", delete: "Usuń", open: "Otwórz", logout: "Wyloguj", email: "Email", password: "Hasło", newPassword: "Nowe hasło", resetPassword: "Odzyskiwanie hasła", chooseFile: "Wybierz PDF", supportedPdf: "Obsługiwane są tylko pliki PDF", calendarName: "Nazwa kalendarza", appleCalendar: "Subskrypcja Apple Calendar", download: "Pobierz .ics" }
 };
 
 if (typeof window !== "undefined") {
@@ -566,11 +566,7 @@ export default function Home() {
   if (!session) {
     return (
       <main className="container">
-        <header className="header">
-          <span className="badge">Amazon POZ2 • Apple Calendar</span>
-          <h1>Work Calendar</h1>
-          <p className="subtitle">Личный календарь смен</p>
-        </header>
+        <header className="header simple-header"><h1>Work Calendar</h1></header>
         <section className="card" style={{maxWidth:520, margin:"0 auto"}}>
           <h2>{authMode === "login" ? copy.signIn : copy.register}</h2>
           <form onSubmit={submitAuth}>
@@ -586,18 +582,16 @@ export default function Home() {
             <button className="secondary" onClick={()=>{setAuthMode(authMode === "login" ? "register" : "login");setAuthError("")}}>{authMode === "login" ? "Нет аккаунта? Регистрация" : "Уже есть аккаунт? Войти"}</button>
           </div>
         </section>
-        {forgotOpen && <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setForgotOpen(false)}><section className="modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><span className="section-kicker">Безопасный доступ</span><h2>Восстановление пароля</h2></div><button className="icon-button" onClick={() => setForgotOpen(false)}>×</button></div><form onSubmit={requestPasswordReset}><label className="field-label">Email<input type="email" value={forgotEmail} onChange={event => setForgotEmail(event.target.value)} required autoFocus /></label><p className="muted">Мы отправим ссылку для создания нового пароля.</p>{forgotStatus && <p className="ok">{forgotStatus}</p>}<div className="modal-actions"><button type="button" className="secondary" onClick={() => setForgotOpen(false)}>Закрыть</button><button className="primary">Отправить ссылку</button></div></form></section></div>}
-        {resetToken && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><span className="section-kicker">Новый пароль</span><h2>Создать пароль</h2></div></div><form onSubmit={resetPasswordRequest}><label className="field-label">Новый пароль<input type="password" minLength={8} value={resetPassword} onChange={event => setResetPassword(event.target.value)} required autoFocus /></label>{resetStatus && <p className={resetStatus.startsWith("Пароль") ? "ok" : "error"}>{resetStatus}</p>}<div className="modal-actions"><button className="primary">Сохранить пароль</button></div></form></section></div>}
+        {forgotOpen && <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setForgotOpen(false)}><section className="modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><span className="section-kicker">Безопасный доступ</span><h2>{copy.resetPassword}</h2></div><button className="icon-button" onClick={() => setForgotOpen(false)} aria-label={copy.close}>×</button></div><form onSubmit={requestPasswordReset}><label className="field-label">{copy.email}<input type="email" value={forgotEmail} onChange={event => setForgotEmail(event.target.value)} required autoFocus /></label><p className="muted">Мы отправим ссылку для создания нового пароля.</p>{forgotStatus && <p className="ok">{forgotStatus}</p>}<div className="modal-actions"><button type="button" className="secondary" onClick={() => setForgotOpen(false)}>{copy.close}</button><button className="primary">Отправить ссылку</button></div></form></section></div>}
+        {resetToken && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><span className="section-kicker">{copy.newPassword}</span><h2>Создать пароль</h2></div><button className="icon-button" onClick={() => { setResetToken(""); window.history.replaceState({}, "", window.location.pathname); }} aria-label={copy.close}>×</button></div><form onSubmit={resetPasswordRequest}><label className="field-label">{copy.newPassword}<input type="password" minLength={8} value={resetPassword} onChange={event => setResetPassword(event.target.value)} required autoFocus /></label>{resetStatus && <p className={resetStatus.startsWith("Пароль") ? "ok" : "error"}>{resetStatus}</p>}<div className="modal-actions"><button type="button" className="secondary" onClick={() => { setResetToken(""); window.history.replaceState({}, "", window.location.pathname); }}>{copy.cancel}</button><button className="primary">{copy.save}</button></div></form></section></div>}
       </main>
     );
   }
 
   return (
     <main className="container">
-      <header className="header">
-        <span className="badge">Amazon POZ2 • Apple Calendar</span>
+      <header className="header simple-header">
         <h1>Work Calendar</h1>
-        <p className="subtitle">PDF графика → проверка → календарь</p>
         <div className="header-actions">
           <button className="user-chip user-button" onClick={() => setProfileMenuOpen(open => !open)} aria-expanded={profileMenuOpen}>
             {profile.avatar ? <img src={profile.avatar} alt="" /> : <span className="avatar-placeholder">{(profile.name || session.email).slice(0, 1).toUpperCase()}</span>}
@@ -612,7 +606,7 @@ export default function Home() {
           <div className="saved-menu-heading">
             <div>
               <span className="section-kicker">Библиотека</span>
-              <h2>Сохранённые месяцы</h2>
+              <h2>{copy.savedMonths}</h2>
             </div>
             <span className="saved-count">{savedCalendars.length} графиков</span>
           </div>
@@ -633,10 +627,10 @@ export default function Home() {
         onDrop={e => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]); }}
       >
         <div style={{ fontSize: 48 }}>📄</div>
-        <h2>Загрузи график</h2>
-        <p className="muted">Поддерживается PDF. Если PDF является сканом, автоматически включится OCR.</p>
+        <h2>{copy.upload}</h2>
+        <p className="muted">{copy.supportedPdf}. Если PDF является сканом, автоматически включится OCR.</p>
         <div className="actions" style={{ justifyContent: "center" }}>
-          <button className="primary" onClick={() => input.current?.click()}>Выбрать файл</button>
+          <button className="primary" onClick={() => input.current?.click()}>{copy.chooseFile}</button>
           <input
             ref={input}
             hidden
@@ -653,7 +647,7 @@ export default function Home() {
 
       {view === "workspace" && schedules.length > 1 && (
         <section className="card">
-          <h2>Графики в PDF</h2>
+          <h2>{copy.pdfSchedules}</h2>
           <p className="muted">Каждая страница PDF распознана как отдельный календарь. Выбери график для проверки и создания своей ссылки Apple Calendar.</p>
           <div className="actions">
             {schedules.map(schedule => {
@@ -676,10 +670,10 @@ export default function Home() {
 
       {view === "workspace" && events.length > 0 && (
         <section className="card">
-          <h2>Проверка графика</h2>
+          <h2>{copy.review}</h2>
           <p className="muted">Выходные не добавляются. Здесь можно вручную исправить дату или время перед экспортом.</p>
           <label className="muted" style={{ display: "block", marginBottom: 12 }}>
-            Название календаря
+            {copy.calendarName}
             <input value={calendarName} onChange={e => setCalendarName(e.target.value)} style={{ width: "100%", marginTop: 6 }} />
           </label>
           {(() => {
@@ -731,7 +725,7 @@ export default function Home() {
           </div>
 
           <div className="actions">
-            <button className="primary" onClick={downloadICS}>📅 Скачать .ics</button>
+            <button className="primary" onClick={downloadICS}>📅 {copy.download}</button>
             <button className="primary" onClick={() => schedules.find(item => item.id === activeScheduleId)?.token ? saveActiveCalendar() : openSaveModal()} disabled={saving}>
               {saving ? "Сохраняю…" : schedules.find(item => item.id === activeScheduleId)?.token ? "💾 Сохранить изменения" : "💾 Сохранить график"}
             </button>
@@ -742,7 +736,7 @@ export default function Home() {
 
       {view === "workspace" && feedUrl && (
         <section className="card">
-          <h2>Подписка Apple Calendar</h2>
+          <h2>{copy.appleCalendar}</h2>
           <p className="muted">Скопируй эту ссылку и вставь в iPhone: Календарь → Календари → Добавить → Добавить подписной календарь.</p>
           <input type="text" readOnly value={feedUrl} onFocus={e => e.currentTarget.select()} style={{ width: "100%" }} />
           <div className="actions">

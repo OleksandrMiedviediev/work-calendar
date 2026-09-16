@@ -4,6 +4,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe 
 button, input { font: inherit; }
 .container { max-width: 1080px; margin: 0 auto; padding: 30px 22px 60px; animation: page-in .45s ease both; }
 .header { margin-bottom: 24px; }
+.simple-header { position:relative; display:flex; align-items:center; justify-content:space-between; min-height:44px; }
+.simple-header h1 { margin:0; }
 .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:#1f2937; color:#cbd5e1; font-size:12px; }
 h1 { font-size: 34px; margin: 10px 0 6px; }
 .subtitle { color:#a1a1aa; margin:0; }
@@ -15,7 +17,7 @@ h1 { font-size: 34px; margin: 10px 0 6px; }
 .secondary { background:#24242c; color:#fff; border:1px solid #3b3b46; border-radius:12px; padding:10px 14px; cursor:pointer; transition:background .18s, border-color .18s, transform .18s; }
 .secondary:hover { background:#30313b; border-color:#5a5d6b; transform:translateY(-1px); }
 .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
-.header-actions { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.header-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; margin-top:0; margin-left:auto; }
 .user-chip { display:flex; align-items:center; gap:8px; color:#d8dae1; font-size:13px; }
 .user-chip img, .avatar-placeholder { width:30px; height:30px; border-radius:50%; object-fit:cover; }
 .avatar-placeholder { display:grid; place-items:center; background:#e5c86b; color:#171717; font-weight:800; }
