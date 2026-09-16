@@ -585,21 +585,6 @@ export default function Home() {
     });
   }
 
-  const eventGroups = [...new Map(
-    events.reduce((groups, event) => {
-      const key = event.date.slice(0, 7);
-      const group = groups.get(key) || [];
-      group.push(event);
-      groups.set(key, group);
-      return groups;
-    }, new Map<string, ShiftEvent[]>())
-  )].sort(([first], [second]) => first.localeCompare(second));
-
-  function monthTitle(key: string) {
-    const [year, month] = key.split("-").map(Number);
-    return `${copy.month} ${new Intl.DateTimeFormat(profile.language, { month: "long" }).format(new Date(year, month - 1, 1))} ${year}`;
-  }
-
   if (!session) {
     return (
       <main className="container">
@@ -729,36 +714,18 @@ export default function Home() {
             );
           })()}
 
-          {eventGroups.map(([month, monthEvents]) => (
-            <div className="schedule-month" key={month}>
-              <div className="schedule-month-heading"><h3>{monthTitle(month)}</h3><span>{monthEvents.length} {copy.shifts}</span></div>
-              <div style={{ overflowX: "auto" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Дата</th>
-                      <th>Начало</th>
-                      <th>Конец</th>
-                      <th>Тип</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthEvents.map(event => {
-                      const index = events.indexOf(event);
-                      return <tr key={`${event.date}-${event.start}-${index}`}>
-                        <td><input value={event.date} onChange={e => updateEvent(index, "date", e.target.value)} /></td>
-                        <td><input value={event.start} onChange={e => updateEvent(index, "start", e.target.value)} /></td>
-                        <td><input value={event.end} onChange={e => updateEvent(index, "end", e.target.value)} /></td>
-                        <td>{event.end < event.start ? "🌙 Ночная" : "☀️ Дневная"}</td>
-                        <td><button className="secondary" onClick={() => removeEvent(index)}>{copy.delete}</button></td>
-                      </tr>;
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead><tr><th>Дата</th><th>Начало</th><th>Конец</th><th>Тип</th><th></th></tr></thead>
+              <tbody>{events.map((event, index) => <tr key={`${event.date}-${event.start}-${index}`}>
+                <td><input value={event.date} onChange={e => updateEvent(index, "date", e.target.value)} /></td>
+                <td><input value={event.start} onChange={e => updateEvent(index, "start", e.target.value)} /></td>
+                <td><input value={event.end} onChange={e => updateEvent(index, "end", e.target.value)} /></td>
+                <td>{event.end < event.start ? "🌙 Ночная" : "☀️ Дневная"}</td>
+                <td><button className="secondary" onClick={() => removeEvent(index)}>{copy.delete}</button></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
 
           <div className="actions">
             <button className="primary" onClick={downloadICS}>📅 {copy.download}</button>
