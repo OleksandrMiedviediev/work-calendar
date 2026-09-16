@@ -81,6 +81,7 @@ export default function Home() {
   const [resetToken, setResetToken] = useState("");
   const [resetPassword, setResetPassword] = useState("");
   const [resetStatus, setResetStatus] = useState("");
+  const [reviewPeriod, setReviewPeriod] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
@@ -95,6 +96,11 @@ export default function Home() {
       .then(d => setSession(d.session || null))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const periods = [...new Set(events.map(event => event.date.slice(0, 7)))].sort();
+    if (!periods.includes(reviewPeriod)) setReviewPeriod(periods[0] || "");
+  }, [events, reviewPeriod]);
 
   useEffect(() => {
     if (!session) return;
@@ -595,6 +601,8 @@ export default function Home() {
     }, new Map<string, ShiftEvent[]>())
   )].sort(([first], [second]) => first.localeCompare(second));
 
+  const reviewPeriodEvents = events.filter(event => event.date.startsWith(reviewPeriod));
+
   function reviewMonthTitle(key: string) {
     const [year, month] = key.split("-").map(Number);
     return `${copy.month} ${new Intl.DateTimeFormat(profile.language, { month: "long" }).format(new Date(year, month - 1, 1))} ${year}`;
@@ -729,13 +737,19 @@ export default function Home() {
             );
           })()}
 
-          {reviewGroups.map(([month, monthEvents]) => (
-            <div className="schedule-month" key={month}>
-              <div className="schedule-month-heading"><h3>{reviewMonthTitle(month)}</h3><span>{monthEvents.length} {copy.shifts}</span></div>
+          <div className="review-pagination" aria-label="Период графика">
+            <button className="secondary compact" onClick={() => { const index = reviewGroups.findIndex(([key]) => key === reviewPeriod); if (index > 0) setReviewPeriod(reviewGroups[index - 1][0]); }} disabled={!reviewPeriod || reviewGroups.findIndex(([key]) => key === reviewPeriod) <= 0}>←</button>
+            <div><strong>{reviewPeriod ? reviewMonthTitle(reviewPeriod) : copy.review}</strong><span>{reviewPeriodEvents.length} {copy.shifts}</span></div>
+            <button className="secondary compact" onClick={() => { const index = reviewGroups.findIndex(([key]) => key === reviewPeriod); if (index >= 0 && index < reviewGroups.length - 1) setReviewPeriod(reviewGroups[index + 1][0]); }} disabled={!reviewPeriod || reviewGroups.findIndex(([key]) => key === reviewPeriod) >= reviewGroups.length - 1}>→</button>
+          </div>
+
+          {reviewPeriod && (
+            <div className="schedule-month">
+              <div className="schedule-month-heading"><h3>{reviewMonthTitle(reviewPeriod)}</h3><span>{reviewPeriodEvents.length} {copy.shifts}</span></div>
               <div style={{ overflowX: "auto" }}>
                 <table>
                   <thead><tr><th>Дата</th><th>Начало</th><th>Конец</th><th>Тип</th><th></th></tr></thead>
-                  <tbody>{monthEvents.map(event => {
+                  <tbody>{reviewPeriodEvents.map(event => {
                     const index = events.indexOf(event);
                     return <tr key={`${event.date}-${event.start}-${index}`}>
                       <td><input value={event.date} onChange={e => updateEvent(index, "date", e.target.value)} /></td>
@@ -748,7 +762,7 @@ export default function Home() {
                 </table>
               </div>
             </div>
-          ))}
+          )}
 
           <div className="actions">
             <button className="primary" onClick={downloadICS}>📅 {copy.download}</button>
