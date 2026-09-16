@@ -26,7 +26,7 @@ h1 { font-size: 34px; margin: 10px 0 6px; }
 .profile-menu strong { padding:8px 10px 10px; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .profile-menu button { text-align:left; border:0; background:transparent; color:#e8e9ed; border-radius:9px; padding:10px; cursor:pointer; }
 .profile-menu button:hover { background:#2a2b35; }
-.main-nav { display:flex; gap:6px; margin-top:24px; border-bottom:1px solid #2a2b35; }
+.main-nav { display:flex; justify-content:center; gap:6px; margin-top:24px; border-bottom:1px solid #2a2b35; }
 .nav-link { border:0; border-bottom:2px solid transparent; background:transparent; color:#8f929d; padding:10px 12px 12px; cursor:pointer; font-weight:700; }
 .nav-link.active { color:#fff; border-color:#e5c86b; }
 table { width:100%; border-collapse:collapse; margin-top:14px; }
@@ -37,7 +37,7 @@ input:focus, select:focus { border-color:#9aa6df; box-shadow:0 0 0 3px rgba(154,
 .error { color:#fca5a5; margin-top:12px; }
 .ok { color:#86efac; margin-top:12px; }
 .muted { color:#8f8f99; font-size:13px; }
-.modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:18px; background:rgba(3,4,8,.78); backdrop-filter:blur(6px); }
+.modal-backdrop { position:fixed; inset:0; z-index:20; display:grid; place-items:start center; padding:clamp(64px, 12vh, 140px) 18px 24px; overflow:auto; background:rgba(3,4,8,.78); backdrop-filter:blur(6px); }
 .modal { width:min(100%, 500px); max-height:calc(100vh - 36px); overflow:auto; background:#181920; border:1px solid #3a3d4a; border-radius:18px; padding:22px; box-shadow:0 24px 70px rgba(0,0,0,.45); }
 .modal-heading { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:20px; }
 .modal h2 { margin:4px 0 0; }
@@ -78,6 +78,7 @@ input:focus, select:focus { border-color:#9aa6df; box-shadow:0 0 0 3px rgba(154,
   .container { padding: 20px 12px 50px; }
   .profile-menu { right:12px; top:104px; }
   .toast { right:12px; left:12px; bottom:12px; max-width:none; }
+  .modal-backdrop { padding:24px 12px; }
   .saved-menu-heading, .saved-row { align-items:stretch; }
   .saved-row { flex-direction:column; }
   .saved-row-actions { width:100%; }
