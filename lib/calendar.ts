@@ -32,7 +32,7 @@ export function toICS(events: ShiftEvent[], calendarName = "Work Calendar") {
       `DTEND;TZID=Europe/Warsaw:${stamp(endDate, event.end)}`,
       `SUMMARY:${esc(event.title)}`,
       event.location ? `LOCATION:${esc(event.location)}` : "",
-      event.kind === "notice" ? `DESCRIPTION:${esc(event.title)}` : event.kind ? `DESCRIPTION:${esc({ day: "Day shift", night: "Night shift", vacation: "Vacation", unpaid: "Unpaid leave", pass: "Pass", parental: "Parental leave" }[event.kind] || event.title)}` : "",
+      event.kind === "notice" ? `DESCRIPTION:${esc(event.title)}` : event.kind === "day" ? "DESCRIPTION:Day shift" : event.kind === "night" ? "DESCRIPTION:Night shift" : event.kind ? `DESCRIPTION:${esc(event.title)}` : "",
       event.kind === "notice" ? "BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Изменение графика\nTRIGGER:PT0M\nEND:VALARM" : "",
       "END:VEVENT"
     ];
