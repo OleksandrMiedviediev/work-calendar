@@ -598,8 +598,9 @@ export default function Home() {
           </button>
           {profileMenuOpen && <div className="profile-menu"><strong>{profile.name || session.email}</strong><button onClick={openSettings}>{copy.settings}</button><button onClick={logout}>Выйти</button></div>}
         </div>
-        <nav className="main-nav" aria-label="Навигация"><button className={view === "workspace" ? "nav-link active" : "nav-link"} onClick={() => setView("workspace")}>{copy.workspace}</button><button className={view === "library" ? "nav-link active" : "nav-link"} onClick={() => setView("library")}>{copy.library}</button></nav>
       </header>
+
+      <nav className="main-nav" aria-label="Навигация"><button className={view === "workspace" ? "nav-link active" : "nav-link"} onClick={() => setView("workspace")}>{copy.workspace}</button><button className={view === "library" ? "nav-link active" : "nav-link"} onClick={() => setView("library")}>{copy.library}</button></nav>
 
       {view === "library" && savedCalendars.length > 0 && (
         <section className="saved-menu">
