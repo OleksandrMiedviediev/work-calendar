@@ -596,7 +596,7 @@ export default function Home() {
           <button className="user-chip user-button" onClick={() => setProfileMenuOpen(open => !open)} aria-expanded={profileMenuOpen}>
             {profile.avatar ? <img src={profile.avatar} alt="" /> : <span className="avatar-placeholder">{(profile.name || session.email).slice(0, 1).toUpperCase()}</span>}
           </button>
-          {profileMenuOpen && <div className="profile-menu"><strong>{profile.name || session.email}</strong><button onClick={openSettings}>{copy.settings}</button><button onClick={logout}>Выйти</button></div>}
+          {profileMenuOpen && <div className="profile-menu"><strong>{profile.name || session.email}</strong><button onClick={openSettings}>{copy.settings}</button><button onClick={logout}>{copy.logout}</button></div>}
         </div>
       </header>
 
