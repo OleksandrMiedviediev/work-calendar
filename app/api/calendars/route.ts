@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   return NextResponse.json({ token, webcalUrl: base.replace(/^https?:/, "webcal:") + `/api/calendars/${token}.ics` });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const db = await getDb();
@@ -32,7 +32,7 @@ export async function GET() {
     .project({ _id: 0, token: 1, name: 1, month: 1, year: 1, events: 1, updatedAt: 1 })
     .sort({ updatedAt: -1 })
     .toArray();
-  const base = process.env.CALENDAR_BASE_URL || "";
+  const base = process.env.CALENDAR_BASE_URL || new URL(req.url).origin;
   return NextResponse.json({ calendars: calendars.map(calendar => ({
     ...calendar,
     eventCount: Array.isArray(calendar.events) ? calendar.events.length : 0,
