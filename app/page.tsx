@@ -10,6 +10,7 @@ type Mode = "pdf" | "ocr" | "";
 type Language = "ru" | "uk" | "en" | "pl";
 type ParsedSchedule = {
   id: string;
+  code: string;
   name: string;
   events: ShiftEvent[];
   summary: ScheduleSummary | null;
@@ -26,6 +27,7 @@ type SavedCalendar = {
   eventCount: number;
   events: ShiftEvent[];
   webcalUrl: string | null;
+  scheduleCode?: string | null;
 };
 
 type Profile = {
@@ -283,6 +285,7 @@ export default function Home() {
         const period = extractSchedulePeriod(pageText);
         return {
           id: `${code}-${index + 1}`,
+          code,
           name: `${code} · ${period ? `${String(period.month).padStart(2, "0")}.${period.year}` : `Страница ${index + 1}`}`,
           events: parsed.events,
           summary: extractScheduleSummary(pageText),
@@ -422,6 +425,7 @@ export default function Home() {
       const ocrParsed = parseScheduleText(ocrText);
       const fallbackSchedule = {
         id: "ocr-1",
+        code: "OCR",
         name: "График из OCR",
         events: ocrParsed.events,
         summary: extractScheduleSummary(ocrText),
@@ -462,6 +466,7 @@ export default function Home() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: calendarName || schedule?.name || "Amazon Work",
+          scheduleCode: schedule?.code,
           month: schedule?.month,
           year: schedule?.year,
           events
@@ -477,7 +482,7 @@ export default function Home() {
       }
       await refreshSavedCalendars();
       localStorage.setItem("work-calendar-feed", data.webcalUrl);
-      setStatus("Готово. Создана персональная ссылка Apple Calendar.");
+      setStatus(data.merged ? "График добавлен в существующий календарь." : "Создана персональная ссылка Apple Calendar.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Ошибка сохранения.");
     } finally {
@@ -552,6 +557,7 @@ export default function Home() {
   function loadSavedCalendar(calendar: SavedCalendar) {
     const schedule: ParsedSchedule = {
       id: `saved-${calendar.token}`,
+      code: calendar.scheduleCode || "SAVED",
       name: calendar.name,
       events: calendar.events || [],
       summary: null,
