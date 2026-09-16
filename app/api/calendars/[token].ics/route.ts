@@ -3,8 +3,9 @@ import { getDb } from "@/lib/mongodb";
 import { toICS } from "@/lib/calendar";
 
 async function findCalendar(token: string) {
+  const normalizedToken = token.replace(/\.ics$/, "");
   const db = await getDb();
-  return db.collection("calendars").findOne({ token });
+  return db.collection("calendars").findOne({ $or: [{ token: normalizedToken }, { slug: normalizedToken }] });
 }
 
 export async function HEAD(_: Request, { params }: { params: Promise<{}> }) {

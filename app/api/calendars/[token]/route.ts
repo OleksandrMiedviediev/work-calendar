@@ -8,7 +8,7 @@ type Context = { params: Promise<{ token: string }> };
 async function getPublicCalendar(rawToken: string) {
   const token = rawToken.replace(/\.ics$/, "");
   const db = await getDb();
-  return db.collection("calendars").findOne({ token });
+  return db.collection("calendars").findOne({ $or: [{ token }, { slug: token }] });
 }
 
 function calendarHeaders() {
