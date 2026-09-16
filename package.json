@@ -9,14 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "bcryptjs": "latest",
+    "jose": "latest",
+    "mongodb": "latest",
     "next": "latest",
+    "nodemailer": "^10.0.10",
     "pdfjs-dist": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "mongodb": "latest",
-    "tesseract.js": "latest",
-    "bcryptjs": "latest",
-    "jose": "latest"
+    "tesseract.js": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",

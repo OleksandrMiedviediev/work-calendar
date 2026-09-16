@@ -1,16 +1,51 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { ShiftEvent } from "../lib/calendar";
 import { toICS } from "../lib/calendar";
-import { parseScheduleText } from "../lib/parser";
+import { extractScheduleCode, extractSchedulePeriod, extractScheduleSummary, parseScheduleText, type ScheduleSummary } from "../lib/parser";
 
 type Mode = "pdf" | "ocr" | "";
+type ParsedSchedule = {
+  id: string;
+  name: string;
+  events: ShiftEvent[];
+  summary: ScheduleSummary | null;
+  month: number | null;
+  year: number | null;
+  token?: string;
+};
+
+type SavedCalendar = {
+  token: string;
+  name: string;
+  month: number | null;
+  year: number | null;
+  eventCount: number;
+  events: ShiftEvent[];
+};
+
+type Profile = {
+  name: string;
+  avatar: string | null;
+};
+
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+    import.meta.url,
+  ).toString();
+}
 
 export default function Home() {
   const input = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [events, setEvents] = useState<ShiftEvent[]>([]);
+  const [schedules, setSchedules] = useState<ParsedSchedule[]>([]);
+  const [activeScheduleId, setActiveScheduleId] = useState("");
+  const [savedCalendars, setSavedCalendars] = useState<SavedCalendar[]>([]);
+  const [calendarName, setCalendarName] = useState("");
   const [status, setStatus] = useState("");
   const [drag, setDrag] = useState(false);
   const [mode, setMode] = useState<Mode>("");
@@ -22,10 +57,42 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [resendStatus, setResendStatus] = useState("");
+  const [profile, setProfile] = useState<Profile>({ name: "", avatar: null });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [profileStatus, setProfileStatus] = useState("");
+  const [avatarInput, setAvatarInput] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me").then(r => r.json()).then(d => setSession(d.session || null)).catch(() => {});
-  });
+    fetch("/api/auth/me")
+      .then(r => r.json())
+      .then(d => setSession(d.session || null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/calendars")
+      .then(response => response.ok ? response.json() : { calendars: [] })
+      .then(data => setSavedCalendars(data.calendars || []))
+      .catch(() => setSavedCalendars([]));
+  }, [session?.userId]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/profile")
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (!data?.profile) return;
+        setProfile({ name: data.profile.name || "", avatar: data.profile.avatar || null });
+      })
+      .catch(() => {});
+  }, [session?.userId]);
 
   async function submitAuth(e: FormEvent) {
     e.preventDefault(); setAuthError("");
@@ -33,25 +100,148 @@ export default function Home() {
       const response = await fetch(`/api/auth/${authMode}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Ошибка авторизации.");
+      if (data.verificationRequired) {
+        setVerificationEmail(email.trim().toLowerCase());
+        setAuthError("Аккаунт создан. Проверь почту и перейди по ссылке подтверждения.");
+        setPassword("");
+        return;
+      }
       setSession({ userId: data.userId || "", email: data.email }); setPassword("");
     } catch (error) { setAuthError(error instanceof Error ? error.message : "Ошибка авторизации."); }
   }
 
+  async function resendVerification() {
+    setResendStatus("");
+    const response = await fetch("/api/auth/resend", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: verificationEmail })
+    });
+    const data = await response.json();
+    setResendStatus(response.ok ? "Письмо отправлено повторно." : data.error || "Не удалось отправить письмо.");
+  }
+
   async function logout() { await fetch("/api/auth/logout", { method: "POST" }); setSession(null); setEvents([]); setFeedUrl(""); }
+
+  function openSettings() {
+    setProfileName(profile.name);
+    setCurrentPassword("");
+    setNewPassword("");
+    setProfileStatus("");
+    setSettingsOpen(true);
+  }
+
+  async function saveProfile(event: FormEvent) {
+    event.preventDefault();
+    setProfileStatus("");
+    const response = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: profileName, avatar: avatarInput ?? profile.avatar, currentPassword, newPassword })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setProfileStatus(data.error || "Не удалось сохранить профиль.");
+      return;
+    }
+    setProfile({ name: data.profile.name, avatar: data.profile.avatar });
+    setAvatarInput(null);
+    setCurrentPassword("");
+    setNewPassword("");
+    setProfileStatus("Профиль сохранён.");
+  }
+
+  function readAvatar(file?: File) {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => setAvatarInput(String(reader.result));
+    reader.readAsDataURL(file);
+  }
 
   async function extractPdfText(file: File) {
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const data = new Uint8Array(await file.arrayBuffer());
     const pdf = await pdfjs.getDocument({ data }).promise;
     const pages: string[] = [];
+    const timePattern = /(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/;
+    const dayPattern = /^([1-9]|[12]\d|3[01])$/;
+    const monthPattern = /20\d{2}|styczeń|lut(y|ego)|marzec|kwiecień|maj|czerwiec|lipiec|sierpień|wrzesień|październik|listopad|grudzień|january|february|march|april|may|june|july|august|september|october|november|december/i;
 
     for (let p = 1; p <= pdf.numPages; p++) {
       const page = await pdf.getPage(p);
       const content = await page.getTextContent();
-      pages.push(content.items.map((item: any) => item.str ?? "").join("\n"));
+      const items = content.items
+        .map((item: any) => ({
+          text: String(item.str ?? "").trim(),
+          x: Number(item.transform?.[4] ?? 0),
+          y: Number(item.transform?.[5] ?? 0)
+        }))
+        .filter((item: { text: string }) => item.text);
+
+      const days = items.filter(item => dayPattern.test(item.text));
+      const times = items.filter(item => timePattern.test(item.text));
+      const pairs: string[] = [];
+
+      for (const time of times) {
+        const match = time.text.match(timePattern);
+        if (!match) continue;
+
+        const day = days
+          .filter(candidate => candidate.y > time.y && candidate.y - time.y < 100)
+          .sort((a, b) => {
+            const aScore = Math.abs(a.x - time.x) + (a.y - time.y) * 0.25;
+            const bScore = Math.abs(b.x - time.x) + (b.y - time.y) * 0.25;
+            return aScore - bScore;
+          })[0];
+
+        if (day && Math.abs(day.x - time.x) < 60) {
+          pairs.push(`${day.text} ${match[1]}-${match[2]}`);
+        }
+      }
+
+      const metadata = items
+        .map(item => item.text)
+        .filter(text => monthPattern.test(text))
+        .join(" ");
+      const code = extractScheduleCode(items.map(item => item.text).join("\n"));
+      const summaryNumbers = items
+        .map(item => item.text)
+        .filter(text => /^\d+$/.test(text))
+        .slice(-3)
+        .join(" ");
+
+      pages.push(pairs.length
+        ? `${metadata}\n${code}\n${pairs.join("\n")}\n${summaryNumbers}`
+        : items.map(item => item.text).join("\n"));
     }
 
-    return { text: pages.join("\n"), pdf };
+    return { text: pages.join("\n"), pages, pdf };
+  }
+
+  function buildSchedules(pages: string[]) {
+    return pages
+      .map((pageText, index) => {
+        const parsed = parseScheduleText(pageText);
+        if (!parsed.events.length) return null;
+        const code = extractScheduleCode(pageText);
+        const period = extractSchedulePeriod(pageText);
+        return {
+          id: `${code}-${index + 1}`,
+          name: `${code} · ${period ? `${String(period.month).padStart(2, "0")}.${period.year}` : `Страница ${index + 1}`}`,
+          events: parsed.events,
+          summary: extractScheduleSummary(pageText),
+          month: period?.month || null,
+          year: period?.year || null
+        };
+      })
+      .filter((schedule): schedule is ParsedSchedule => Boolean(schedule));
+  }
+
+  function selectSchedule(schedule: ParsedSchedule) {
+    setActiveScheduleId(schedule.id);
+    setEvents(schedule.events);
+    setCalendarName(schedule.name);
+    setFeedUrl("");
   }
 
   async function renderPdfPagesToImages(file: File) {
@@ -74,15 +264,64 @@ export default function Home() {
     return images;
   }
 
+  async function prepareImageForOCR(dataUrl: string, threshold: number | null) {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Не удалось прочитать изображение для OCR."));
+      image.src = dataUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    const scale = 2;
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas недоступен.");
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { data } = imageData;
+
+    if (threshold === null) return canvas.toDataURL("image/png");
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const value = gray > 180 ? 255 : 0;
+      data[i] = value;
+      data[i + 1] = value;
+      data[i + 2] = value;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL("image/png");
+  }
+
   async function runOCR(images: string[]) {
-    const { createWorker } = await import("tesseract.js");
+    const { createWorker, PSM } = await import("tesseract.js");
     const worker = await createWorker("eng+pol");
     let result = "";
 
     for (let i = 0; i < images.length; i++) {
       setStatus(`OCR: страница ${i + 1} из ${images.length}`);
-      const ret = await worker.recognize(images[i]);
-      result += "\n" + ret.data.text;
+      // Keep the original colors as well as a high-contrast version: colored
+      // calendar cells can lose characters during thresholding.
+      for (const threshold of [null, 180]) {
+        const prepared = await prepareImageForOCR(images[i], threshold);
+
+        // Calendar screenshots need both block and sparse-text segmentation.
+        for (const pageSegMode of [PSM.SINGLE_BLOCK, PSM.SPARSE_TEXT]) {
+          await worker.setParameters({ tessedit_pageseg_mode: pageSegMode });
+          const ret = await worker.recognize(prepared);
+          result += "\n" + ret.data.text;
+        }
+      }
+
       setProgress(Math.round(((i + 1) / images.length) * 100));
     }
 
@@ -95,39 +334,28 @@ export default function Home() {
 
     setFileName(file.name);
     setEvents([]);
+    setSchedules([]);
+    setActiveScheduleId("");
     setStatus("");
     setProgress(0);
     setMode("");
 
     try {
       const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      const isImage = file.type.startsWith("image/");
 
-      if (!isPdf && !isImage) {
-        throw new Error("Загрузи PDF, PNG или JPG.");
-      }
-
-      if (isImage) {
-        setMode("ocr");
-        setStatus("Запускаю OCR…");
-        const text = await runOCR([URL.createObjectURL(file)]);
-        const parsed = parseScheduleText(text);
-        setEvents(parsed.events);
-        setStatus(parsed.events.length
-          ? `OCR завершён. Найдено смен: ${parsed.events.length}`
-          : "OCR завершён, но смены не распознаны. Их можно будет добавить вручную в следующей версии."
-        );
-        return;
+      if (!isPdf) {
+        throw new Error("Загрузи файл в формате PDF.");
       }
 
       setStatus("Читаю текстовый слой PDF…");
-      const { text } = await extractPdfText(file);
-      const parsed = parseScheduleText(text);
+      const { text, pages } = await extractPdfText(file);
+      const parsedSchedules = buildSchedules(pages);
 
-      if (parsed.events.length > 0) {
+      if (parsedSchedules.length > 0) {
         setMode("pdf");
-        setEvents(parsed.events);
-        setStatus(`Готово. Найдено смен: ${parsed.events.length}`);
+        setSchedules(parsedSchedules);
+        selectSchedule(parsedSchedules[0]);
+        setStatus(`Готово. Найдено графиков: ${parsedSchedules.length}`);
         return;
       }
 
@@ -136,6 +364,16 @@ export default function Home() {
       const images = await renderPdfPagesToImages(file);
       const ocrText = await runOCR(images);
       const ocrParsed = parseScheduleText(ocrText);
+      const fallbackSchedule = {
+        id: "ocr-1",
+        name: "График из OCR",
+        events: ocrParsed.events,
+        summary: extractScheduleSummary(ocrText),
+        month: extractSchedulePeriod(ocrText)?.month || null,
+        year: extractSchedulePeriod(ocrText)?.year || null
+      };
+      setSchedules(ocrParsed.events.length ? [fallbackSchedule] : []);
+      setActiveScheduleId(ocrParsed.events.length ? fallbackSchedule.id : "");
       setEvents(ocrParsed.events);
       setStatus(ocrParsed.events.length
         ? `OCR завершён. Найдено смен: ${ocrParsed.events.length}`
@@ -162,16 +400,26 @@ export default function Home() {
     setStatus("");
 
     try {
+      const schedule = schedules.find(item => item.id === activeScheduleId);
       const response = await fetch("/api/calendars", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Amazon Work", events })
+        body: JSON.stringify({
+          name: calendarName || schedule?.name || "Amazon Work",
+          month: schedule?.month,
+          year: schedule?.year,
+          events
+        })
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Не удалось создать календарь.");
 
       setFeedUrl(data.webcalUrl);
+      if (schedule) {
+        setSchedules(current => current.map(item => item.id === schedule.id ? { ...item, token: data.token, name: calendarName || item.name } : item));
+      }
+      await refreshSavedCalendars();
       localStorage.setItem("work-calendar-feed", data.webcalUrl);
       setStatus("Готово. Создана персональная ссылка Apple Calendar.");
     } catch (error) {
@@ -181,12 +429,83 @@ export default function Home() {
     }
   }
 
+  function openSaveModal() {
+    const schedule = schedules.find(item => item.id === activeScheduleId);
+    setCalendarName(calendarName || schedule?.name || "Amazon Work");
+    setSaveOpen(true);
+  }
+
+  async function refreshSavedCalendars() {
+    const response = await fetch("/api/calendars");
+    if (response.ok) {
+      const data = await response.json();
+      setSavedCalendars(data.calendars || []);
+    }
+  }
+
+  async function saveActiveCalendar() {
+    const schedule = schedules.find(item => item.id === activeScheduleId);
+    if (!schedule?.token) return createAppleFeed();
+
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/calendars/${schedule.token}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: calendarName || schedule.name, events })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Не удалось сохранить календарь.");
+      setSchedules(current => current.map(item => item.id === schedule.id ? { ...item, name: calendarName || item.name } : item));
+      await refreshSavedCalendars();
+      setStatus("Изменения сохранены.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Ошибка сохранения.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSavedCalendar(token: string) {
+    try {
+      const response = await fetch(`/api/calendars/${token}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Не удалось удалить календарь.");
+      setSavedCalendars(current => current.filter(calendar => calendar.token !== token));
+      setSchedules(current => current.map(schedule => schedule.token === token ? { ...schedule, token: undefined } : schedule));
+      setStatus("Календарь удалён.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Ошибка удаления.");
+    }
+  }
+
+  function loadSavedCalendar(calendar: SavedCalendar) {
+    const schedule: ParsedSchedule = {
+      id: `saved-${calendar.token}`,
+      name: calendar.name,
+      events: calendar.events || [],
+      summary: null,
+      month: calendar.month,
+      year: calendar.year,
+      token: calendar.token
+    };
+    setSchedules(current => [...current.filter(item => item.id !== schedule.id), schedule]);
+    selectSchedule(schedule);
+  }
+
   function removeEvent(index: number) {
-    setEvents(prev => prev.filter((_, i) => i !== index));
+    setEvents(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      setSchedules(current => current.map(schedule => schedule.id === activeScheduleId ? { ...schedule, events: next } : schedule));
+      return next;
+    });
   }
 
   function updateEvent(index: number, field: keyof ShiftEvent, value: string) {
-    setEvents(prev => prev.map((event, i) => i === index ? { ...event, [field]: value } : event));
+    setEvents(prev => {
+      const next = prev.map((event, i) => i === index ? { ...event, [field]: value } : event);
+      setSchedules(current => current.map(schedule => schedule.id === activeScheduleId ? { ...schedule, events: next } : schedule));
+      return next;
+    });
   }
 
   if (!session) {
@@ -203,6 +522,8 @@ export default function Home() {
             <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required style={{width:"100%",marginBottom:10}} />
             <input type="password" placeholder="Пароль (минимум 8 символов)" value={password} onChange={e=>setPassword(e.target.value)} required minLength={8} style={{width:"100%",marginBottom:10}} />
             {authError && <p className="error">{authError}</p>}
+            {verificationEmail && <button type="button" className="secondary" onClick={resendVerification}>Отправить письмо ещё раз</button>}
+            {resendStatus && <p className={resendStatus.startsWith("Письмо") ? "ok" : "error"}>{resendStatus}</p>}
             <button className="primary" type="submit" style={{width:"100%"}}>{authMode === "login" ? "Войти" : "Создать аккаунт"}</button>
           </form>
           <div className="actions" style={{justifyContent:"center"}}>
@@ -219,9 +540,45 @@ export default function Home() {
       <header className="header">
         <span className="badge">Amazon POZ2 • Apple Calendar</span>
         <h1>Work Calendar</h1>
-        <p className="subtitle">PDF или фото графика → OCR → проверка → календарь</p>
-        <div className="actions" style={{justifyContent:"center",marginTop:12}}><span className="muted">👤 {session.email}</span><button className="secondary" onClick={logout}>Выйти</button></div>
+        <p className="subtitle">PDF графика → проверка → календарь</p>
+        <div className="header-actions">
+          <span className="user-chip">
+            {profile.avatar ? <img src={profile.avatar} alt="" /> : <span className="avatar-placeholder">{(profile.name || session.email).slice(0, 1).toUpperCase()}</span>}
+            {profile.name || session.email}
+          </span>
+          <button className="secondary" onClick={openSettings}>Настройки</button>
+          <button className="secondary" onClick={logout}>Выйти</button>
+        </div>
       </header>
+
+      {savedCalendars.length > 0 && (
+        <section className="saved-menu">
+          <div className="saved-menu-heading">
+            <div>
+              <span className="section-kicker">Библиотека</span>
+              <h2>Сохранённые месяцы</h2>
+            </div>
+            <span className="saved-count">{savedCalendars.length} графиков</span>
+          </div>
+          <div className="saved-list">
+            {savedCalendars.map(calendar => (
+              <div key={calendar.token} className="saved-row">
+                <div className="saved-row-main">
+                  <span className="month-mark">{calendar.month ? String(calendar.month).padStart(2, "0") : "--"}</span>
+                  <div>
+                    <strong>{calendar.name}</strong>
+                    <span className="saved-meta">{calendar.year || "Без года"} · {calendar.eventCount} смен</span>
+                  </div>
+                </div>
+                <div className="saved-row-actions">
+                  <button className="secondary compact" onClick={() => loadSavedCalendar(calendar)}>Открыть</button>
+                  <button className="danger-button" onClick={() => deleteSavedCalendar(calendar.token)} aria-label={`Удалить ${calendar.name}`}>Удалить</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section
         className={`card drop ${drag ? "drag" : ""}`}
@@ -231,14 +588,14 @@ export default function Home() {
       >
         <div style={{ fontSize: 48 }}>📄</div>
         <h2>Загрузи график</h2>
-        <p className="muted">Поддерживаются PDF, PNG и JPG. Если PDF является сканом, автоматически включится OCR.</p>
+        <p className="muted">Поддерживается PDF. Если PDF является сканом, автоматически включится OCR.</p>
         <div className="actions" style={{ justifyContent: "center" }}>
           <button className="primary" onClick={() => input.current?.click()}>Выбрать файл</button>
           <input
             ref={input}
             hidden
             type="file"
-            accept="application/pdf,image/png,image/jpeg"
+            accept="application/pdf,.pdf"
             onChange={e => handleFile(e.target.files?.[0])}
           />
         </div>
@@ -248,10 +605,51 @@ export default function Home() {
         {status && <p className={events.length ? "ok" : "error"}>{status}</p>}
       </section>
 
+      {schedules.length > 1 && (
+        <section className="card">
+          <h2>Графики в PDF</h2>
+          <p className="muted">Каждая страница PDF распознана как отдельный календарь. Выбери график для проверки и создания своей ссылки Apple Calendar.</p>
+          <div className="actions">
+            {schedules.map(schedule => {
+              const selected = schedule.id === activeScheduleId;
+              const expected = schedule.summary?.total;
+              const actual = schedule.events.length;
+              return (
+                <button
+                  key={schedule.id}
+                  className={selected ? "primary" : "secondary"}
+                  onClick={() => selectSchedule(schedule)}
+                >
+                  {schedule.name} · {actual}{expected ? `/${expected}` : ""}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {events.length > 0 && (
         <section className="card">
           <h2>Проверка графика</h2>
           <p className="muted">Выходные не добавляются. Здесь можно вручную исправить дату или время перед экспортом.</p>
+          <label className="muted" style={{ display: "block", marginBottom: 12 }}>
+            Название календаря
+            <input value={calendarName} onChange={e => setCalendarName(e.target.value)} style={{ width: "100%", marginTop: 6 }} />
+          </label>
+          {(() => {
+            const active = schedules.find(schedule => schedule.id === activeScheduleId);
+            if (!active?.summary) return null;
+            const dayCount = events.filter(event => event.kind === "day").length;
+            const nightCount = events.filter(event => event.kind === "night").length;
+            const matches = events.length === active.summary.total
+              && dayCount === active.summary.day
+              && nightCount === active.summary.night;
+            return (
+              <p className={matches ? "ok" : "error"}>
+                {matches ? "✓ " : "⚠ "}Найдено {events.length} из {active.summary.total} смен · дневных {dayCount}/{active.summary.day}, ночных {nightCount}/{active.summary.night}
+              </p>
+            );
+          })()}
 
           <div style={{ overflowX: "auto" }}>
             <table>
@@ -288,8 +686,8 @@ export default function Home() {
 
           <div className="actions">
             <button className="primary" onClick={downloadICS}>📅 Скачать .ics</button>
-            <button className="primary" onClick={createAppleFeed} disabled={saving}>
-              {saving ? "Создаю…" : "🍎 Создать Apple Calendar"}
+            <button className="primary" onClick={() => schedules.find(item => item.id === activeScheduleId)?.token ? saveActiveCalendar() : openSaveModal()} disabled={saving}>
+              {saving ? "Сохраняю…" : schedules.find(item => item.id === activeScheduleId)?.token ? "💾 Сохранить изменения" : "💾 Сохранить график"}
             </button>
             <button className="secondary" onClick={() => setEvents([])}>Очистить</button>
           </div>
@@ -308,11 +706,37 @@ export default function Home() {
       )}
 
       <section className="card">
-        <h2>Следующий этап</h2>
-        <p className="muted">
-          Теперь OCR уже встроен. Дальше мы улучшим именно Amazon parser, чтобы он понимал сетку календаря даже когда OCR возвращает текст в неправильном порядке.
-        </p>
+        <h2>Готово</h2>
+        <p className="muted">Графики сохраняются по месяцам из PDF. Каждый вариант можно отдельно редактировать, обновлять или удалять.</p>
       </section>
+
+      {saveOpen && (
+        <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setSaveOpen(false)}>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="save-title">
+            <div className="modal-heading"><div><span className="section-kicker">Новый календарь</span><h2 id="save-title">Сохранить график</h2></div><button className="icon-button" onClick={() => setSaveOpen(false)} aria-label="Закрыть">×</button></div>
+            <label className="field-label">Название<input value={calendarName} onChange={event => setCalendarName(event.target.value)} autoFocus /></label>
+            <p className="muted">График будет сохранён на сервере вместе с месяцем и годом из PDF.</p>
+            <div className="modal-actions"><button className="secondary" onClick={() => setSaveOpen(false)}>Отмена</button><button className="primary" onClick={() => { setSaveOpen(false); void createAppleFeed(); }}>Сохранить</button></div>
+          </section>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setSettingsOpen(false)}>
+          <section className="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <div className="modal-heading"><div><span className="section-kicker">Аккаунт</span><h2 id="settings-title">Настройки профиля</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="Закрыть">×</button></div>
+            <form onSubmit={saveProfile}>
+              <div className="profile-preview">{avatarInput || profile.avatar ? <img src={avatarInput || profile.avatar || ""} alt="Аватар" /> : <span>{(profile.name || session.email).slice(0, 1).toUpperCase()}</span>}<label className="secondary file-button">Изменить аватар<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => readAvatar(event.target.files?.[0])} /></label></div>
+              <label className="field-label">Имя<input value={profileName} onChange={event => setProfileName(event.target.value)} placeholder="Как к тебе обращаться" /></label>
+              <div className="settings-divider">Смена пароля</div>
+              <label className="field-label">Текущий пароль<input type="password" value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} /></label>
+              <label className="field-label">Новый пароль<input type="password" minLength={8} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="Минимум 8 символов" /></label>
+              {profileStatus && <p className={profileStatus === "Профиль сохранён." ? "ok" : "error"}>{profileStatus}</p>}
+              <div className="modal-actions"><button type="button" className="secondary" onClick={() => setSettingsOpen(false)}>Закрыть</button><button type="submit" className="primary">Сохранить профиль</button></div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

@@ -8,6 +8,12 @@ export type ParseResult = {
   warnings: string[];
 };
 
+export type ScheduleSummary = {
+  day: number;
+  night: number;
+  total: number;
+};
+
 const monthMap: Record<string, number> = {
   styczeń: 1, stycznia: 1, january: 1,
   luty: 2, lutego: 2, february: 2,
@@ -42,6 +48,44 @@ function dateIso(year: number, month: number, day: number) {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+export function extractScheduleCode(text: string) {
+  const excluded = new Set(["POZ2", "LEADERS", "ASSOCIATES", "OB", "ATOZ"]);
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim().toUpperCase())
+    .filter(Boolean);
+
+  const candidates = lines.filter(line =>
+    /^[A-Z0-9]+(?:-[A-Z0-9]+)?$/.test(line)
+    && line.length >= 5
+    && line.length <= 14
+    && /[A-Z]/.test(line)
+    && /\d/.test(line)
+    && !excluded.has(line)
+    && !/^20\d{2}$/.test(line)
+  );
+
+  return candidates[0] || "График";
+}
+
+export function extractSchedulePeriod(text: string) {
+  const detected = detectMonthYear(text);
+  return detected ? { month: detected.month, year: detected.year } : null;
+}
+
+export function extractScheduleSummary(text: string): ScheduleSummary | null {
+  const matches = [...text.matchAll(/(\d+)\s+(\d+)\s+(\d+)\s*$/gm)];
+  const match = matches.reverse().find(item => {
+    const day = Number(item[1]);
+    const night = Number(item[2]);
+    const total = Number(item[3]);
+    return day + night === total && total > 0 && total <= 31;
+  });
+
+  if (!match) return null;
+  return { day: Number(match[1]), night: Number(match[2]), total: Number(match[3]) };
+}
+
 export function parseScheduleText(rawText: string): ParseResult {
   const warnings: string[] = [];
   const detected = detectMonthYear(rawText);
@@ -61,7 +105,7 @@ export function parseScheduleText(rawText: string): ParseResult {
 
   const events: ShiftEvent[] = [];
 
-  // Works with OCR where a day number and time are often on the same line
+  // Works with PDF text where a day and time are on the same line
   // or on neighbouring lines.
   for (let i = 0; i < lines.length; i++) {
     const current = lines[i];

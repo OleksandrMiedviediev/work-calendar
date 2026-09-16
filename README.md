@@ -3,6 +3,7 @@
 Next.js app for Amazon work schedules: PDF/image → text/OCR → shift parser → Apple Calendar.
 
 ## Features
+
 - Registration and login with email/password.
 - HTTP-only signed session cookie (30 days).
 - Every calendar belongs to the logged-in user.
@@ -14,6 +15,7 @@ Next.js app for Amazon work schedules: PDF/image → text/OCR → shift parser �
 - MongoDB persistence.
 
 ## Run locally
+
 ```bash
 npm install
 cp .env.example .env.local
@@ -21,15 +23,29 @@ npm run dev
 ```
 
 Required variables:
+
 - `MONGODB_URI`
 - `MONGODB_DB`
 - `AUTH_SECRET` — long random secret
 - `CALENDAR_BASE_URL` — production URL, e.g. `https://your-project.vercel.app`
 
+Email verification variables:
+
+- `APP_BASE_URL` — public app URL used in verification links, e.g. `http://localhost:3000` locally
+- `BREVO_API_KEY` — recommended; avoids SMTP IP restrictions
+- `SMTP_HOST`
+- `SMTP_PORT` — usually `587`
+- `SMTP_SECURE` — `true` for port `465`, otherwise `false`
+- `SMTP_USER`
+- `SMTP_PASS` — SMTP password or provider API password
+- `MAIL_FROM` — optional sender address
+
 ## Vercel
+
 Push the project to GitHub, import it into Vercel, then add the same environment variables under Settings → Environment Variables and redeploy. Vercel documents environment variables and recommends keeping secrets server-side, not in `NEXT_PUBLIC_*`. citeturn0search0turn0search1
 
 ## Security
+
 - Passwords are bcrypt-hashed.
 - Session cookie is HTTP-only and signed.
 - Calendar creation requires an authenticated session.
@@ -37,6 +53,7 @@ Push the project to GitHub, import it into Vercel, then add the same environment
 - Database credentials and `AUTH_SECRET` must never use `NEXT_PUBLIC_`.
 
 ## Next planned additions
+
 - Google and Apple OAuth via Auth.js.
 - Forgot/reset password email flow.
 - Persistent calendar token so uploading a new PDF updates the same Apple subscription.
