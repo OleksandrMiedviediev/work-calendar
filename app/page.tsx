@@ -8,6 +8,7 @@ import { extractScheduleCode, extractSchedulePeriod, extractScheduleSummary, par
 
 type Mode = "pdf" | "ocr" | "";
 type Language = "ru" | "uk" | "en" | "pl";
+type ScheduleEventKind = NonNullable<ShiftEvent["kind"]>;
 type ParsedSchedule = {
   id: string;
   code: string;
@@ -41,6 +42,13 @@ const uiCopy: Record<Language, { signIn: string; register: string; forgot: strin
   uk: { signIn: "Увійти", register: "Створити акаунт", forgot: "Забули пароль?", settings: "Налаштування", library: "Бібліотека", workspace: "Робоча область", upload: "Завантажити графік", savedMonths: "Збережені місяці", pdfSchedules: "Графіки в PDF", review: "Перевірка графіка", save: "Зберегти", close: "Закрити", cancel: "Скасувати", delete: "Видалити", open: "Відкрити", logout: "Вийти", email: "Email", password: "Пароль", newPassword: "Новий пароль", resetPassword: "Відновлення пароля", chooseFile: "Обрати PDF", supportedPdf: "Підтримується лише PDF", calendarName: "Назва календаря", appleCalendar: "Підписка Apple Calendar", download: "Завантажити .ics", charts: "графіків", month: "Місяць", account: "Акаунт", avatar: "Змінити аватар", name: "Ім’я", language: "Мова інтерфейсу", changePassword: "Зміна пароля", currentPassword: "Поточний пароль", shifts: "змін", noDate: "Без дати", noYear: "Без року", copyLink: "Скопіювати", share: "Поділитися" },
   en: { signIn: "Sign in", register: "Create account", forgot: "Forgot password?", settings: "Settings", library: "Library", workspace: "Workspace", upload: "Upload schedule", savedMonths: "Saved months", pdfSchedules: "PDF schedules", review: "Schedule review", save: "Save", close: "Close", cancel: "Cancel", delete: "Delete", open: "Open", logout: "Sign out", email: "Email", password: "Password", newPassword: "New password", resetPassword: "Password recovery", chooseFile: "Choose PDF", supportedPdf: "PDF files only", calendarName: "Calendar name", appleCalendar: "Apple Calendar subscription", download: "Download .ics", charts: "schedules", month: "Month", account: "Account", avatar: "Change avatar", name: "Name", language: "Interface language", changePassword: "Change password", currentPassword: "Current password", shifts: "shifts", noDate: "No date", noYear: "No year", copyLink: "Copy link", share: "Share" },
   pl: { signIn: "Zaloguj się", register: "Utwórz konto", forgot: "Nie pamiętasz hasła?", settings: "Ustawienia", library: "Biblioteka", workspace: "Obszar pracy", upload: "Prześlij grafik", savedMonths: "Zapisane miesiące", pdfSchedules: "Grafiki PDF", review: "Sprawdzenie grafiku", save: "Zapisz", close: "Zamknij", cancel: "Anuluj", delete: "Usuń", open: "Otwórz", logout: "Wyloguj", email: "Email", password: "Hasło", newPassword: "Nowe hasło", resetPassword: "Odzyskiwanie hasła", chooseFile: "Wybierz PDF", supportedPdf: "Obsługiwane są tylko pliki PDF", calendarName: "Nazwa kalendarza", appleCalendar: "Subskrypcja Apple Calendar", download: "Pobierz .ics", charts: "grafików", month: "Miesiąc", account: "Konto", avatar: "Zmień awatar", name: "Imię", language: "Język interfejsu", changePassword: "Zmiana hasła", currentPassword: "Obecne hasło", shifts: "zmian", noDate: "Brak daty", noYear: "Brak roku", copyLink: "Kopiuj link", share: "Udostępnij" }
+};
+
+const eventTypeCopy: Record<Language, Record<ScheduleEventKind, string>> = {
+  ru: { day: "Дневная", night: "Ночная", vacation: "Отпуск", unpaid: "Бесплатный отпуск", pass: "Пропуск", parental: "Родительский отпуск", notice: "Уведомление" },
+  uk: { day: "Денна", night: "Нічна", vacation: "Відпустка", unpaid: "Відпустка без оплати", pass: "Перепустка", parental: "Батьківська відпустка", notice: "Повідомлення" },
+  en: { day: "Day shift", night: "Night shift", vacation: "Vacation", unpaid: "Unpaid leave", pass: "Pass", parental: "Parental leave", notice: "Notice" },
+  pl: { day: "Zmiana dzienna", night: "Zmiana nocna", vacation: "Urlop", unpaid: "Urlop bezpłatny", pass: "Przepustka", parental: "Urlop rodzicielski", notice: "Powiadomienie" }
 };
 
 if (typeof window !== "undefined") {
@@ -591,6 +599,17 @@ export default function Home() {
     });
   }
 
+  function updateEventKind(index: number, kind: ScheduleEventKind) {
+    setEvents(prev => {
+      const next = prev.map((event, eventIndex) => eventIndex === index
+        ? { ...event, kind, title: eventTypeCopy[profile.language][kind] || event.title }
+        : event
+      );
+      setSchedules(current => current.map(schedule => schedule.id === activeScheduleId ? { ...schedule, events: next } : schedule));
+      return next;
+    });
+  }
+
   const reviewGroups = [...new Map(
     events.reduce((groups, event) => {
       const key = event.date.slice(0, 7);
@@ -755,7 +774,11 @@ export default function Home() {
                       <td><input value={event.date} onChange={e => updateEvent(index, "date", e.target.value)} /></td>
                       <td><input value={event.start} onChange={e => updateEvent(index, "start", e.target.value)} /></td>
                       <td><input value={event.end} onChange={e => updateEvent(index, "end", e.target.value)} /></td>
-                      <td>{event.end < event.start ? "🌙 Ночная" : "☀️ Дневная"}</td>
+                      <td>
+                        <select value={event.kind === "notice" ? "day" : (event.kind || (event.end < event.start ? "night" : "day"))} onChange={e => updateEventKind(index, e.target.value as ScheduleEventKind)}>
+                          {(["day", "night", "vacation", "unpaid", "pass", "parental"] as ScheduleEventKind[]).map(kind => <option key={kind} value={kind}>{eventTypeCopy[profile.language][kind]}</option>)}
+                        </select>
+                      </td>
                       <td><button className="secondary" onClick={() => removeEvent(index)}>{copy.delete}</button></td>
                     </tr>;
                   })}</tbody>
