@@ -4,8 +4,10 @@ export type ShiftEvent = {
   end: string;        // HH:mm
   title: string;
   location?: string;
-  kind?: "day" | "night";
+  kind?: "day" | "night" | "notice";
 };
+
+const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 
 function esc(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
@@ -22,9 +24,27 @@ function stamp(date: string, time: string) {
 }
 
 export function toICS(events: ShiftEvent[], calendarName = "Work Calendar") {
-  const body = events.map((event, i) => {
-    const endDate = event.end < event.start ? nextDate(event.date) : event.date;
+  const months = [...new Set(events.map(event => event.date.slice(0, 7)))].sort();
+  const monthHeaders = months.map(month => {
+    const [year, monthNumber] = month.split("-").map(Number);
+    const date = `${month}-01`;
+    const nextMonth = monthNumber === 12 ? `${year + 1}-01-01` : `${year}-${String(monthNumber + 1).padStart(2, "0")}-01`;
     return [
+      "BEGIN:VEVENT",
+      `UID:work-calendar-month-${month}@work-calendar`,
+      `DTSTAMP:${stamp(date, "00:00")}`,
+      `DTSTART;VALUE=DATE:${date.replaceAll("-", "")}`,
+      `DTEND;VALUE=DATE:${nextMonth.replaceAll("-", "")}`,
+      `SUMMARY:${esc(`${monthNames[monthNumber - 1]} ${year}`)}`,
+      "TRANSP:TRANSPARENT",
+      "X-MICROSOFT-CDO-BUSYSTATUS:FREE",
+      "END:VEVENT"
+    ].join("\r\n");
+  });
+
+  const eventBody = events.map((event, i) => {
+    const endDate = event.end < event.start ? nextDate(event.date) : event.date;
+    const lines = [
       "BEGIN:VEVENT",
       `UID:work-calendar-${event.date}-${event.start.replace(":", "")}-${i}@work-calendar`,
       `DTSTAMP:${stamp(event.date, "12:00")}`,
@@ -32,10 +52,13 @@ export function toICS(events: ShiftEvent[], calendarName = "Work Calendar") {
       `DTEND;TZID=Europe/Warsaw:${stamp(endDate, event.end)}`,
       `SUMMARY:${esc(event.title)}`,
       event.location ? `LOCATION:${esc(event.location)}` : "",
-      event.kind ? `DESCRIPTION:${esc(event.kind === "night" ? "Night shift" : "Day shift")}` : "",
+      event.kind === "notice" ? `DESCRIPTION:${esc(event.title)}` : event.kind ? `DESCRIPTION:${esc(event.kind === "night" ? "Night shift" : "Day shift")}` : "",
+      event.kind === "notice" ? "BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Изменение графика\nTRIGGER:PT0M\nEND:VALARM" : "",
       "END:VEVENT"
-    ].filter(Boolean).join("\r\n");
+    ];
+    return lines.filter(Boolean).join("\r\n");
   }).join("\r\n");
+  const body = [...monthHeaders, eventBody].filter(Boolean).join("\r\n");
 
   return [
     "BEGIN:VCALENDAR",

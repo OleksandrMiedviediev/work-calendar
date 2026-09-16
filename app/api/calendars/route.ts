@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getDb } from "@/lib/mongodb";
 import { getSession } from "@/lib/auth";
+import type { ShiftEvent } from "@/lib/calendar";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -15,13 +16,22 @@ export async function POST(req: Request) {
     : null;
   const token = existing?.token || randomBytes(24).toString("hex");
   const slug = existing?.slug || randomBytes(9).toString("base64url");
-  const incomingEvents = Array.isArray(body.events) ? body.events : [];
+  const incomingEvents: ShiftEvent[] = Array.isArray(body.events) ? body.events : [];
+  const previousEvents = (existing?.events || []) as ShiftEvent[];
+  const previousKeys = new Set(previousEvents.filter(event => event.kind !== "notice").map(event => `${event.date}|${event.start}|${event.end}`));
+  const changedEvents = incomingEvents.filter(event => !previousKeys.has(`${event.date}|${event.start}|${event.end}`));
+  const incomingDates = new Set(incomingEvents.map(event => event.date));
+  const retainedEvents = previousEvents.filter(event => event.kind === "notice" || !incomingDates.has(event.date));
   const events = [...new Map(
-    [...(existing?.events || []), ...incomingEvents]
+    [...retainedEvents, ...incomingEvents]
       .map(event => [`${event.date}|${event.start}|${event.end}`, event])
   ).values()];
 
   if (existing) {
+    if (changedEvents.length > 0) {
+      const noticeDate = new Date().toISOString().slice(0, 10);
+      events.push({ date: noticeDate, start: "09:00", end: "09:15", title: `График обновлён: добавлено смен — ${changedEvents.length}`, kind: "notice", location: "Work Calendar" });
+    }
     await calendars.updateOne(
       { _id: existing._id },
       { $set: { name: body.name || existing.name || "Work Calendar", month: body.month || existing.month || null, year: body.year || existing.year || null, events, updatedAt: new Date() } }
