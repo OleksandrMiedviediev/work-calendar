@@ -1,8 +1,33 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { getSession } from "@/lib/auth";
+import { toICS } from "@/lib/calendar";
 
 type Context = { params: Promise<{ token: string }> };
+
+async function getPublicCalendar(rawToken: string) {
+  const token = rawToken.replace(/\.ics$/, "");
+  const db = await getDb();
+  return db.collection("calendars").findOne({ token });
+}
+
+function calendarHeaders() {
+  return { "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "no-store" };
+}
+
+export async function HEAD(_: Request, { params }: Context) {
+  const { token } = await params;
+  const calendar = await getPublicCalendar(token);
+  if (!calendar) return new NextResponse("Not found", { status: 404 });
+  return new NextResponse(null, { headers: calendarHeaders() });
+}
+
+export async function GET(_: Request, { params }: Context) {
+  const { token } = await params;
+  const calendar = await getPublicCalendar(token);
+  if (!calendar) return new NextResponse("Not found", { status: 404 });
+  return new NextResponse(toICS(calendar.events || [], calendar.name || "Work Calendar"), { headers: calendarHeaders() });
+}
 
 export async function PATCH(req: Request, { params }: Context) {
   const session = await getSession();
