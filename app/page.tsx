@@ -7,6 +7,7 @@ import { toICS } from "../lib/calendar";
 import { extractScheduleCode, extractSchedulePeriod, extractScheduleSummary, parseScheduleText, type ScheduleSummary } from "../lib/parser";
 
 type Mode = "pdf" | "ocr" | "";
+type Language = "ru" | "uk" | "en" | "pl";
 type ParsedSchedule = {
   id: string;
   name: string;
@@ -29,6 +30,14 @@ type SavedCalendar = {
 type Profile = {
   name: string;
   avatar: string | null;
+  language: Language;
+};
+
+const uiCopy: Record<Language, { signIn: string; register: string; forgot: string; settings: string; library: string; workspace: string; upload: string }> = {
+  ru: { signIn: "Войти", register: "Создать аккаунт", forgot: "Забыли пароль?", settings: "Настройки", library: "Библиотека", workspace: "Рабочая область", upload: "Загрузить график" },
+  uk: { signIn: "Увійти", register: "Створити акаунт", forgot: "Забули пароль?", settings: "Налаштування", library: "Бібліотека", workspace: "Робоча область", upload: "Завантажити графік" },
+  en: { signIn: "Sign in", register: "Create account", forgot: "Forgot password?", settings: "Settings", library: "Library", workspace: "Workspace", upload: "Upload schedule" },
+  pl: { signIn: "Zaloguj się", register: "Utwórz konto", forgot: "Nie pamiętasz hasła?", settings: "Ustawienia", library: "Biblioteka", workspace: "Obszar pracy", upload: "Prześlij grafik" }
 };
 
 if (typeof window !== "undefined") {
@@ -59,7 +68,16 @@ export default function Home() {
   const [authError, setAuthError] = useState("");
   const [verificationEmail, setVerificationEmail] = useState("");
   const [resendStatus, setResendStatus] = useState("");
-  const [profile, setProfile] = useState<Profile>({ name: "", avatar: null });
+  const [profile, setProfile] = useState<Profile>({ name: "", avatar: null, language: "ru" });
+  const [view, setView] = useState<"workspace" | "library">("workspace");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "ok" | "error" } | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotStatus, setForgotStatus] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetStatus, setResetStatus] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
@@ -84,12 +102,19 @@ export default function Home() {
   }, [session?.userId]);
 
   useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("reset");
+    if (token) setResetToken(token);
+  }, []);
+
+  const copy = uiCopy[profile.language];
+
+  useEffect(() => {
     if (!session) return;
     fetch("/api/profile")
       .then(response => response.ok ? response.json() : null)
       .then(data => {
         if (!data?.profile) return;
-        setProfile({ name: data.profile.name || "", avatar: data.profile.avatar || null });
+        setProfile({ name: data.profile.name || "", avatar: data.profile.avatar || null, language: data.profile.language || "ru" });
       })
       .catch(() => {});
   }, [session?.userId]);
@@ -108,6 +133,27 @@ export default function Home() {
       }
       setSession({ userId: data.userId || "", email: data.email }); setPassword("");
     } catch (error) { setAuthError(error instanceof Error ? error.message : "Ошибка авторизации."); }
+  }
+
+  function notify(message: string, type: "ok" | "error" = "ok") {
+    setToast({ message, type });
+    window.setTimeout(() => setToast(null), 3600);
+  }
+
+  async function requestPasswordReset(event: FormEvent) {
+    event.preventDefault();
+    setForgotStatus("");
+    const response = await fetch("/api/auth/forgot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: forgotEmail }) });
+    const data = await response.json();
+    setForgotStatus(response.ok ? data.message : data.error || "Не удалось отправить письмо.");
+  }
+
+  async function resetPasswordRequest(event: FormEvent) {
+    event.preventDefault();
+    const response = await fetch("/api/auth/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: resetToken, password: resetPassword }) });
+    const data = await response.json();
+    setResetStatus(response.ok ? "Пароль изменён. Теперь можно войти." : data.error || "Не удалось изменить пароль.");
+    if (response.ok) window.history.replaceState({}, "", window.location.pathname);
   }
 
   async function resendVerification() {
@@ -144,11 +190,20 @@ export default function Home() {
       setProfileStatus(data.error || "Не удалось сохранить профиль.");
       return;
     }
-    setProfile({ name: data.profile.name, avatar: data.profile.avatar });
+    setProfile({ name: data.profile.name, avatar: data.profile.avatar, language: data.profile.language || profile.language });
     setAvatarInput(null);
     setCurrentPassword("");
     setNewPassword("");
     setProfileStatus("Профиль сохранён.");
+    notify("Профиль сохранён.");
+  }
+
+  async function changeLanguage(language: Language) {
+    const response = await fetch("/api/profile", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: profile.name, avatar: profile.avatar, language }) });
+    if (response.ok) {
+      setProfile(current => ({ ...current, language }));
+      notify("Язык интерфейса сохранён.");
+    }
   }
 
   function readAvatar(file?: File) {
@@ -517,20 +572,22 @@ export default function Home() {
           <p className="subtitle">Личный календарь смен</p>
         </header>
         <section className="card" style={{maxWidth:520, margin:"0 auto"}}>
-          <h2>{authMode === "login" ? "Вход" : "Регистрация"}</h2>
+          <h2>{authMode === "login" ? copy.signIn : copy.register}</h2>
           <form onSubmit={submitAuth}>
             <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required style={{width:"100%",marginBottom:10}} />
             <input type="password" placeholder="Пароль (минимум 8 символов)" value={password} onChange={e=>setPassword(e.target.value)} required minLength={8} style={{width:"100%",marginBottom:10}} />
             {authError && <p className="error">{authError}</p>}
             {verificationEmail && <button type="button" className="secondary" onClick={resendVerification}>Отправить письмо ещё раз</button>}
             {resendStatus && <p className={resendStatus.startsWith("Письмо") ? "ok" : "error"}>{resendStatus}</p>}
-            <button className="primary" type="submit" style={{width:"100%"}}>{authMode === "login" ? "Войти" : "Создать аккаунт"}</button>
+            <button className="primary" type="submit" style={{width:"100%"}}>{authMode === "login" ? copy.signIn : copy.register}</button>
           </form>
+          {authMode === "login" && <button className="link-button" onClick={() => { setForgotEmail(email); setForgotOpen(true); }}>{copy.forgot}</button>}
           <div className="actions" style={{justifyContent:"center"}}>
             <button className="secondary" onClick={()=>{setAuthMode(authMode === "login" ? "register" : "login");setAuthError("")}}>{authMode === "login" ? "Нет аккаунта? Регистрация" : "Уже есть аккаунт? Войти"}</button>
           </div>
-          <p className="muted" style={{marginTop:16}}>Google/Apple OAuth можно подключить после базовой авторизации, через провайдеров Auth.js.</p>
         </section>
+        {forgotOpen && <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setForgotOpen(false)}><section className="modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><span className="section-kicker">Безопасный доступ</span><h2>Восстановление пароля</h2></div><button className="icon-button" onClick={() => setForgotOpen(false)}>×</button></div><form onSubmit={requestPasswordReset}><label className="field-label">Email<input type="email" value={forgotEmail} onChange={event => setForgotEmail(event.target.value)} required autoFocus /></label><p className="muted">Мы отправим ссылку для создания нового пароля.</p>{forgotStatus && <p className="ok">{forgotStatus}</p>}<div className="modal-actions"><button type="button" className="secondary" onClick={() => setForgotOpen(false)}>Закрыть</button><button className="primary">Отправить ссылку</button></div></form></section></div>}
+        {resetToken && <div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><span className="section-kicker">Новый пароль</span><h2>Создать пароль</h2></div></div><form onSubmit={resetPasswordRequest}><label className="field-label">Новый пароль<input type="password" minLength={8} value={resetPassword} onChange={event => setResetPassword(event.target.value)} required autoFocus /></label>{resetStatus && <p className={resetStatus.startsWith("Пароль") ? "ok" : "error"}>{resetStatus}</p>}<div className="modal-actions"><button className="primary">Сохранить пароль</button></div></form></section></div>}
       </main>
     );
   }
@@ -542,16 +599,15 @@ export default function Home() {
         <h1>Work Calendar</h1>
         <p className="subtitle">PDF графика → проверка → календарь</p>
         <div className="header-actions">
-          <span className="user-chip">
+          <button className="user-chip user-button" onClick={() => setProfileMenuOpen(open => !open)} aria-expanded={profileMenuOpen}>
             {profile.avatar ? <img src={profile.avatar} alt="" /> : <span className="avatar-placeholder">{(profile.name || session.email).slice(0, 1).toUpperCase()}</span>}
-            {profile.name || session.email}
-          </span>
-          <button className="secondary" onClick={openSettings}>Настройки</button>
-          <button className="secondary" onClick={logout}>Выйти</button>
+          </button>
+          {profileMenuOpen && <div className="profile-menu"><strong>{profile.name || session.email}</strong><button onClick={openSettings}>{copy.settings}</button><button onClick={logout}>Выйти</button></div>}
         </div>
+        <nav className="main-nav" aria-label="Навигация"><button className={view === "workspace" ? "nav-link active" : "nav-link"} onClick={() => setView("workspace")}>{copy.workspace}</button><button className={view === "library" ? "nav-link active" : "nav-link"} onClick={() => setView("library")}>{copy.library}</button></nav>
       </header>
 
-      {savedCalendars.length > 0 && (
+      {view === "library" && savedCalendars.length > 0 && (
         <section className="saved-menu">
           <div className="saved-menu-heading">
             <div>
@@ -561,26 +617,16 @@ export default function Home() {
             <span className="saved-count">{savedCalendars.length} графиков</span>
           </div>
           <div className="saved-list">
-            {savedCalendars.map(calendar => (
-              <div key={calendar.token} className="saved-row">
-                <div className="saved-row-main">
-                  <span className="month-mark">{calendar.month ? String(calendar.month).padStart(2, "0") : "--"}</span>
-                  <div>
-                    <strong>{calendar.name}</strong>
-                    <span className="saved-meta">{calendar.year || "Без года"} · {calendar.eventCount} смен</span>
-                  </div>
-                </div>
-                <div className="saved-row-actions">
-                  <button className="secondary compact" onClick={() => loadSavedCalendar(calendar)}>Открыть</button>
-                  <button className="danger-button" onClick={() => deleteSavedCalendar(calendar.token)} aria-label={`Удалить ${calendar.name}`}>Удалить</button>
-                </div>
-              </div>
-            ))}
+            {[...savedCalendars].sort((a, b) => `${b.year || 0}-${b.month || 0}`.localeCompare(`${a.year || 0}-${a.month || 0}`)).map((calendar, index, all) => {
+              const group = `${calendar.year || "Без года"}-${calendar.month || 0}`;
+              const previous = index > 0 ? `${all[index - 1].year || "Без года"}-${all[index - 1].month || 0}` : "";
+              return <div key={calendar.token}>{group !== previous && <div className="library-group">{calendar.month ? `Месяц ${String(calendar.month).padStart(2, "0")}.${calendar.year}` : "Без даты"}</div>}<div className="saved-row"><div className="saved-row-main"><span className="month-mark">{calendar.month ? String(calendar.month).padStart(2, "0") : "--"}</span><div><strong>{calendar.name}</strong><span className="saved-meta">{calendar.year || "Без года"} · {calendar.eventCount} смен</span></div></div><div className="saved-row-actions"><button className="secondary compact" onClick={() => { loadSavedCalendar(calendar); setView("workspace"); }}>Открыть</button><button className="danger-button" onClick={() => deleteSavedCalendar(calendar.token)} aria-label={`Удалить ${calendar.name}`}>Удалить</button></div></div></div>;
+            })}
           </div>
         </section>
       )}
 
-      <section
+      {view === "workspace" && <section
         className={`card drop ${drag ? "drag" : ""}`}
         onDragOver={e => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}
@@ -603,9 +649,9 @@ export default function Home() {
         {mode && <p className="muted">Режим: {mode === "ocr" ? "OCR распознавание" : "Чтение текста PDF"}</p>}
         {progress > 0 && progress < 100 && <p className="muted">Прогресс OCR: {progress}%</p>}
         {status && <p className={events.length ? "ok" : "error"}>{status}</p>}
-      </section>
+      </section>}
 
-      {schedules.length > 1 && (
+      {view === "workspace" && schedules.length > 1 && (
         <section className="card">
           <h2>Графики в PDF</h2>
           <p className="muted">Каждая страница PDF распознана как отдельный календарь. Выбери график для проверки и создания своей ссылки Apple Calendar.</p>
@@ -628,7 +674,7 @@ export default function Home() {
         </section>
       )}
 
-      {events.length > 0 && (
+      {view === "workspace" && events.length > 0 && (
         <section className="card">
           <h2>Проверка графика</h2>
           <p className="muted">Выходные не добавляются. Здесь можно вручную исправить дату или время перед экспортом.</p>
@@ -694,7 +740,7 @@ export default function Home() {
         </section>
       )}
 
-      {feedUrl && (
+      {view === "workspace" && feedUrl && (
         <section className="card">
           <h2>Подписка Apple Calendar</h2>
           <p className="muted">Скопируй эту ссылку и вставь в iPhone: Календарь → Календари → Добавить → Добавить подписной календарь.</p>
@@ -704,11 +750,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      <section className="card">
-        <h2>Готово</h2>
-        <p className="muted">Графики сохраняются по месяцам из PDF. Каждый вариант можно отдельно редактировать, обновлять или удалять.</p>
-      </section>
 
       {saveOpen && (
         <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setSaveOpen(false)}>
@@ -728,6 +769,7 @@ export default function Home() {
             <form onSubmit={saveProfile}>
               <div className="profile-preview">{avatarInput || profile.avatar ? <img src={avatarInput || profile.avatar || ""} alt="Аватар" /> : <span>{(profile.name || session.email).slice(0, 1).toUpperCase()}</span>}<label className="secondary file-button">Изменить аватар<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => readAvatar(event.target.files?.[0])} /></label></div>
               <label className="field-label">Имя<input value={profileName} onChange={event => setProfileName(event.target.value)} placeholder="Как к тебе обращаться" /></label>
+              <label className="field-label">Язык интерфейса<select value={profile.language} onChange={event => void changeLanguage(event.target.value as Language)}><option value="ru">Русский</option><option value="uk">Українська</option><option value="en">English</option><option value="pl">Polski</option></select></label>
               <div className="settings-divider">Смена пароля</div>
               <label className="field-label">Текущий пароль<input type="password" value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} /></label>
               <label className="field-label">Новый пароль<input type="password" minLength={8} value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="Минимум 8 символов" /></label>
@@ -737,6 +779,7 @@ export default function Home() {
           </section>
         </div>
       )}
+      {toast && <div className={`toast ${toast.type}`} role="status">{toast.message}</div>}
     </main>
   );
 }

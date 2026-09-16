@@ -9,6 +9,7 @@ type UserRecord = {
   name?: string;
   avatar?: string | null;
   updatedAt?: Date;
+  language?: "ru" | "uk" | "en" | "pl";
 };
 
 export async function GET() {
@@ -49,6 +50,8 @@ export async function PATCH(req: Request) {
     update.passwordHash = await hashPassword(String(body.newPassword));
   }
 
+  const language = ["ru", "uk", "en", "pl"].includes(body.language) ? body.language : undefined;
+  if (language) update.language = language;
   await users.updateOne({ _id: session.userId }, { $set: update });
-  return NextResponse.json({ ok: true, profile: { name, avatar } });
+  return NextResponse.json({ ok: true, profile: { name, avatar, language } });
 }

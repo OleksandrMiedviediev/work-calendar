@@ -52,3 +52,29 @@ export async function sendVerificationEmail(email: string, token: string) {
     html
   });
 }
+
+export async function sendPasswordResetEmail(email: string, token: string) {
+  const baseUrl = required("APP_BASE_URL").replace(/\/$/, "");
+  const resetUrl = `${baseUrl}/?reset=${encodeURIComponent(token)}`;
+  const subject = "Восстановление пароля Work Calendar";
+  const text = `Восстановить пароль: ${resetUrl}`;
+  const html = `<main style="font-family:Arial,sans-serif;max-width:560px;margin:40px auto"><h1>Work Calendar</h1><p>Мы получили запрос на восстановление пароля.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#111;color:#fff;text-decoration:none;border-radius:8px">Создать новый пароль</a></p><p>Ссылка действует 1 час.</p></main>`;
+
+  if (process.env.BREVO_API_KEY) {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { accept: "application/json", "api-key": process.env.BREVO_API_KEY, "content-type": "application/json" },
+      body: JSON.stringify({ sender: { email: process.env.MAIL_FROM || required("SMTP_USER") }, to: [{ email }], subject, textContent: text, htmlContent: html })
+    });
+    if (!response.ok) throw new Error(`Brevo API rejected reset email: ${response.status}`);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: required("SMTP_HOST"),
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user: required("SMTP_USER"), pass: required("SMTP_PASS") }
+  });
+  await transporter.sendMail({ from: process.env.MAIL_FROM || required("SMTP_USER"), to: email, subject, text, html });
+}
