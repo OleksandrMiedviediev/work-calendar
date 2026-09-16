@@ -32,6 +32,11 @@ h1 { font-size: 34px; margin: 10px 0 6px; }
 table { width:100%; border-collapse:collapse; margin-top:14px; }
 th, td { padding:11px 8px; border-bottom:1px solid #2a2a33; text-align:left; font-size:14px; }
 th { color:#a1a1aa; font-weight:600; }
+.schedule-month { margin-top:18px; padding:14px; border:1px solid #30323d; border-radius:14px; background:rgba(12,13,18,.42); }
+.schedule-month:first-of-type { margin-top:12px; }
+.schedule-month-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 2px 8px; border-bottom:1px solid #30323d; }
+.schedule-month-heading h3 { margin:0; color:#f2d77d; font-size:16px; text-transform:capitalize; }
+.schedule-month-heading span { color:#9297a5; font-size:12px; }
 select, input[type="text"], input[type="email"], input[type="password"], input[type="date"] { background:#0f0f14; color:#fff; border:1px solid #3b3b46; border-radius:10px; padding:10px 11px; outline:none; transition:border-color .18s, box-shadow .18s; }
 input:focus, select:focus { border-color:#9aa6df; box-shadow:0 0 0 3px rgba(154,166,223,.15); }
 .error { color:#fca5a5; margin-top:12px; }
