@@ -42,6 +42,24 @@ th { color:#a1a1aa; font-weight:600; }
 .review-pagination strong, .review-pagination span { display:block; }
 .review-pagination strong { color:#f2d77d; font-size:15px; text-transform:capitalize; }
 .review-pagination span { color:#9297a5; font-size:12px; margin-top:3px; }
+.calendar-grid { margin-top:14px; overflow:hidden; border:1px solid #30323d; border-radius:14px; }
+.calendar-weekdays, .calendar-days { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); }
+.calendar-weekdays { background:#20222c; border-bottom:1px solid #3a3d49; }
+.calendar-weekdays span { padding:10px 8px; color:#9da4b6; font-size:12px; font-weight:800; text-align:center; }
+.calendar-day { min-height:128px; padding:8px; border-right:1px solid #2c2f39; border-bottom:1px solid #2c2f39; background:#111219; }
+.calendar-day:nth-child(7n) { border-right:0; }
+.calendar-day.empty { background:#0d0e13; }
+.calendar-day.has-events { background:#171923; }
+.calendar-day-number { display:block; color:#dfe1e7; font-size:13px; margin-bottom:7px; }
+.calendar-event { position:relative; padding:7px; margin-top:5px; border-left:3px solid #8a91b8; border-radius:7px; background:#252936; }
+.calendar-event.day { border-color:#e5c86b; background:#393526; }
+.calendar-event.night { border-color:#8da7df; background:#28334a; }
+.calendar-event.vacation, .calendar-event.unpaid, .calendar-event.pass, .calendar-event.parental { border-color:#ca91d6; background:#3b2d40; }
+.calendar-event select { width:100%; border:0; padding:2px 14px 2px 2px; background:transparent; color:#f3f4f7; font-size:11px; font-weight:700; }
+.calendar-event-times { display:flex; align-items:center; gap:3px; margin-top:5px; }
+.calendar-event-times input { width:calc(50% - 7px); min-width:0; padding:4px; border:1px solid #555a6b; border-radius:5px; background:#111219; color:#fff; font-size:11px; }
+.calendar-event-times span { color:#b9bdc8; font-size:11px; }
+.calendar-remove { position:absolute; top:2px; right:2px; border:0; background:transparent; color:#c5c8d1; cursor:pointer; font-size:15px; line-height:1; }
 select, input[type="text"], input[type="email"], input[type="password"], input[type="date"] { background:#0f0f14; color:#fff; border:1px solid #3b3b46; border-radius:10px; padding:10px 11px; outline:none; transition:border-color .18s, box-shadow .18s; }
 input:focus, select:focus { border-color:#9aa6df; box-shadow:0 0 0 3px rgba(154,166,223,.15); }
 .error { color:#fca5a5; margin-top:12px; }
@@ -97,6 +115,11 @@ input:focus, select:focus { border-color:#9aa6df; box-shadow:0 0 0 3px rgba(154,
   .modal-actions button { width:100%; }
   .review-pagination { gap:8px; }
   .review-pagination > div { min-width:0; flex:1; }
+  .calendar-day { min-height:100px; padding:5px; }
+  .calendar-weekdays span { padding:8px 2px; font-size:10px; }
+  .calendar-event { padding:4px; }
+  .calendar-event select { font-size:9px; }
+  .calendar-event-times input { font-size:9px; padding:3px 2px; }
 }
 @keyframes page-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
 @keyframes rise-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }

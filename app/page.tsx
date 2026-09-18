@@ -627,6 +627,13 @@ export default function Home() {
     return `${copy.month} ${new Intl.DateTimeFormat(profile.language, { month: "long" }).format(new Date(year, month - 1, 1))} ${year}`;
   }
 
+  function calendarDays(key: string) {
+    const [year, month] = key.split("-").map(Number);
+    const count = new Date(year, month, 0).getDate();
+    const firstDay = (new Date(year, month - 1, 1).getDay() + 6) % 7;
+    return [...Array(firstDay).fill(null), ...Array.from({ length: count }, (_, index) => `${key}-${String(index + 1).padStart(2, "0")}`)];
+  }
+
   if (!session) {
     return (
       <main className="container">
@@ -765,25 +772,11 @@ export default function Home() {
           {reviewPeriod && (
             <div className="schedule-month">
               <div className="schedule-month-heading"><h3>{reviewMonthTitle(reviewPeriod)}</h3><span>{reviewPeriodEvents.length} {copy.shifts}</span></div>
-              <div style={{ overflowX: "auto" }}>
-                <table>
-                  <thead><tr><th>Дата</th><th>Начало</th><th>Конец</th><th>Тип</th><th></th></tr></thead>
-                  <tbody>{reviewPeriodEvents.map(event => {
-                    const index = events.indexOf(event);
-                    return <tr key={`${event.date}-${event.start}-${index}`}>
-                      <td><input value={event.date} onChange={e => updateEvent(index, "date", e.target.value)} /></td>
-                      <td><input value={event.start} onChange={e => updateEvent(index, "start", e.target.value)} /></td>
-                      <td><input value={event.end} onChange={e => updateEvent(index, "end", e.target.value)} /></td>
-                      <td>
-                        <select value={event.kind === "notice" ? "day" : (event.kind || (event.end < event.start ? "night" : "day"))} onChange={e => updateEventKind(index, e.target.value as ScheduleEventKind)}>
-                          {(["day", "night", "vacation", "unpaid", "pass", "parental"] as ScheduleEventKind[]).map(kind => <option key={kind} value={kind}>{eventTypeCopy[profile.language][kind]}</option>)}
-                        </select>
-                      </td>
-                      <td><button className="secondary" onClick={() => removeEvent(index)}>{copy.delete}</button></td>
-                    </tr>;
-                  })}</tbody>
-                </table>
-              </div>
+              <div className="calendar-grid"><div className="calendar-weekdays">{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map(day => <span key={day}>{day}</span>)}</div><div className="calendar-days">{calendarDays(reviewPeriod).map((date, cellIndex) => {
+                if (!date) return <div className="calendar-day empty" key={`empty-${cellIndex}`} />;
+                const dayEvents = reviewPeriodEvents.filter(event => event.date === date);
+                return <div className={`calendar-day ${dayEvents.length ? "has-events" : ""}`} key={date}><strong className="calendar-day-number">{Number(date.slice(-2))}</strong>{dayEvents.map(event => { const index = events.indexOf(event); const kind = event.kind === "notice" ? "day" : (event.kind || (event.end < event.start ? "night" : "day")); return <div className={`calendar-event ${kind}`} key={`${date}-${index}`}><select value={kind} onChange={e => updateEventKind(index, e.target.value as ScheduleEventKind)} aria-label="Тип смены">{(["day", "night", "vacation", "unpaid", "pass", "parental"] as ScheduleEventKind[]).map(option => <option key={option} value={option}>{eventTypeCopy[profile.language][option]}</option>)}</select><div className="calendar-event-times"><input value={event.start} onChange={e => updateEvent(index, "start", e.target.value)} /><span>–</span><input value={event.end} onChange={e => updateEvent(index, "end", e.target.value)} /></div><button className="calendar-remove" onClick={() => removeEvent(index)} aria-label={copy.delete}>×</button></div>; })}</div>;
+              })}</div></div>
             </div>
           )}
 
