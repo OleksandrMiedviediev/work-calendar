@@ -610,6 +610,16 @@ export default function Home() {
     });
   }
 
+  function addEvent(date: string) {
+    const event: ShiftEvent = { date, start: "06:15", end: "17:00", title: eventTypeCopy[profile.language].day, kind: "day", location: "POZ2" };
+    setEvents(previous => {
+      const next = [...previous, event].sort((first, second) => `${first.date}${first.start}`.localeCompare(`${second.date}${second.start}`));
+      setSchedules(current => current.map(schedule => schedule.id === activeScheduleId ? { ...schedule, events: next } : schedule));
+      return next;
+    });
+    notify("Смена добавлена. Не забудь сохранить изменения.");
+  }
+
   const reviewGroups = [...new Map(
     events.reduce((groups, event) => {
       const key = event.date.slice(0, 7);
@@ -775,7 +785,8 @@ export default function Home() {
               <div className="calendar-grid"><div className="calendar-weekdays">{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map(day => <span key={day}>{day}</span>)}</div><div className="calendar-days">{calendarDays(reviewPeriod).map((date, cellIndex) => {
                 if (!date) return <div className="calendar-day empty" key={`empty-${cellIndex}`} />;
                 const dayEvents = reviewPeriodEvents.filter(event => event.date === date);
-                return <div className={`calendar-day ${dayEvents.length ? "has-events" : ""}`} key={date}><strong className="calendar-day-number">{Number(date.slice(-2))}</strong>{dayEvents.map(event => { const index = events.indexOf(event); const kind = event.kind === "notice" ? "day" : (event.kind || (event.end < event.start ? "night" : "day")); return <div className={`calendar-event ${kind}`} key={`${date}-${index}`}><select value={kind} onChange={e => updateEventKind(index, e.target.value as ScheduleEventKind)} aria-label="Тип смены">{(["day", "night", "vacation", "unpaid", "pass", "parental"] as ScheduleEventKind[]).map(option => <option key={option} value={option}>{eventTypeCopy[profile.language][option]}</option>)}</select><div className="calendar-event-times"><input value={event.start} onChange={e => updateEvent(index, "start", e.target.value)} /><span>–</span><input value={event.end} onChange={e => updateEvent(index, "end", e.target.value)} /></div><button className="calendar-remove" onClick={() => removeEvent(index)} aria-label={copy.delete}>×</button></div>; })}</div>;
+                const today = new Date().toISOString().slice(0, 10);
+                return <div className={`calendar-day ${dayEvents.length ? "has-events" : ""} ${date === today ? "today" : ""}`} key={date}><div className="calendar-day-top"><strong className="calendar-day-number">{Number(date.slice(-2))}</strong>{!dayEvents.length && <button className="calendar-add" onClick={() => addEvent(date)} aria-label="Добавить событие">+</button>}</div>{dayEvents.map(event => { const index = events.indexOf(event); const kind = event.kind === "notice" ? "day" : (event.kind || (event.end < event.start ? "night" : "day")); return <div className={`calendar-event ${kind}`} key={`${date}-${index}`}><select value={kind} onChange={e => updateEventKind(index, e.target.value as ScheduleEventKind)} aria-label="Тип смены">{(["day", "night", "vacation", "unpaid", "pass", "parental"] as ScheduleEventKind[]).map(option => <option key={option} value={option}>{eventTypeCopy[profile.language][option]}</option>)}</select><div className="calendar-event-times"><input value={event.start} onChange={e => updateEvent(index, "start", e.target.value)} /><span>–</span><input value={event.end} onChange={e => updateEvent(index, "end", e.target.value)} /></div><button className="calendar-remove" onClick={() => removeEvent(index)} aria-label={copy.delete}>×</button></div>; })}</div>;
               })}</div></div>
             </div>
           )}

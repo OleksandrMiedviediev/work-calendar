@@ -51,6 +51,11 @@ th { color:#a1a1aa; font-weight:600; }
 .calendar-day.empty { background:#0d0e13; }
 .calendar-day.has-events { background:#171923; }
 .calendar-day-number { display:block; color:#dfe1e7; font-size:13px; margin-bottom:7px; }
+.calendar-day-top { display:flex; align-items:center; justify-content:space-between; min-height:22px; }
+.calendar-day.today { box-shadow:inset 0 0 0 2px #f0d36c; background:#1d1b16; }
+.calendar-day.today .calendar-day-number { color:#f0d36c; }
+.calendar-add { width:22px; height:22px; border:1px dashed #666b7b; border-radius:6px; background:transparent; color:#cbd0df; cursor:pointer; line-height:1; }
+.calendar-add:hover { border-color:#f0d36c; color:#f0d36c; background:#312d1e; }
 .calendar-event { position:relative; padding:7px; margin-top:5px; border-left:3px solid #8a91b8; border-radius:7px; background:#252936; }
 .calendar-event.day { border-color:#e5c86b; background:#393526; }
 .calendar-event.night { border-color:#8da7df; background:#28334a; }
